@@ -24,6 +24,16 @@ def init_db():
     conn.commit()
     conn.close()
     
+    #Tabela para não ocupar espaço no Banco com o dispositivos MAC repetidos.
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS dispositivos_descobertos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            ip TEXT,
+            mac TEXT UNIQUE,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
+        )       
+   ''')
+    
 def salvar_no_historico(dispositivos):
     #Abrimos a conexão
     conn = sqlite3.connect('seguranca.db')

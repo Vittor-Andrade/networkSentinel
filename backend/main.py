@@ -43,6 +43,16 @@ def cadastrar_dispositivo(disp: DispositivoConhecido):
         conn.close()
 
 @app.get("/api/dispositivos")
+def salvar_no_historico(dispositivos): #usando o INSERT OR REPLACE para evitar DUPLICATAS no Banco
+    conn = sqlite3.connenct('seguranca.db')
+    cursor = conn.cursor()
+    for d in dispositivos:
+        cursor.execute('''
+            INSERT OR REPLACE INTO dispositivos_descobertos (ip, mac, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)     
+        ''', (d['ip'], d['mac']))
+        conn.commit()
+        conn.close()
+
 def get_dispositivos():
     range_rede = "192.168.15.1/24"
     dispositivos = scan_network(range_rede)
