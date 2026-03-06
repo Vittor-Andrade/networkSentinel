@@ -64,6 +64,27 @@ def salvar_no_historico(dispositivos): #usando o INSERT OR REPLACE para evitar D
         print(f"Erro ao salvar: {e}")
     finally:
         conn.close()
+        
+@app.get("/api/historico")
+def get_historico():
+    conn = sqlite3.connect('seguranca.db')
+    cursor = conn.cursor()
+    try:
+        #Usando uma subquery para pegar a última aparição de cada MAC
+        cursor.execute('''
+            SELECT ip, mac, strftime('%d/%m/%Y %H:%M:%S', MAX(data_hora)) as ultima_vista
+            FROM historico 
+            WHERE mac IS NOT NULL
+            GROUP BY mac 
+            ORDER BY data_hora DESC
+        ''')
+        rows = cursor.fetchall()
+        logs = [{"ip": row[0], "mac": row[1], "data": row[2]} for row in rows]
+        return logs
+    except Exception as e:
+        return {"status": "erro", "mensagem": str(e)}
+    finally:
+        conn.close()
 
 @app.get("/api/dispositivos")
 def get_dispositivos():
@@ -83,7 +104,6 @@ def get_dispositivos():
         # Garantimos que o MAC está em minúsculo para comparar
         mac_atual = d['mac'].lower()
         
-        # O print corrigido (sem o erro de NameError)
         print(f"Debug: Processando MAC {mac_atual}")
         
         if mac_atual in whitelist:
