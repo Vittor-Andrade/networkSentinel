@@ -1,0 +1,68 @@
+.App { 
+text-align: center;
+font-family: sans-serif;
+background-color: #f4f7f6;
+min-height: 100vh;
+}
+
+.App-header {
+background-color: #282c34;
+padding: 20px;
+color: white;
+display: flex;
+justify-content: space-around;
+align-items: center;
+}
+
+button {
+padding: 10px 20px;
+font-size: 16px;
+cursor: pointer;
+background-color: #61dafb;
+border: none;
+border-radius: 5px;
+font-weight: bold; 
+}
+
+button:disabled {
+background-color: #ccc;
+}
+
+main {
+padding: 20px;
+display: flex;
+justify-content: center;
+}
+
+table {
+width: 90%;
+border-collapse: collapse;
+background: white;
+box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+}
+
+th, td {
+padding: 15px;
+border-bottom: 1px solid #ddd;
+text-align: left;
+}
+
+.badge {
+padding: 5px 10px;
+border-radius: 20px;
+font-size: 12px;
+font-weight: bold;
+text-transform: uppercase; }
+
+.conhecido {
+background-color: #d4edda;
+color: #155724;
+}
+
+.intruso {
+background-color: #f8d7da;
+color: #721c24;
+animation: blink 1.5s infinite;
+}
+
+@keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
