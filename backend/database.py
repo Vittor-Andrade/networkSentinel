@@ -21,8 +21,6 @@ def init_db():
             data_hora DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     ''')
-    conn.commit()
-    conn.close()
     
     #Tabela para não ocupar espaço no Banco com o dispositivos MAC repetidos.
     cursor.execute('''
@@ -33,6 +31,8 @@ def init_db():
             last_seen DATETIME DEFAULT CURRENT_TIMESTAMP
         )       
    ''')
+    conn.commit()
+    conn.close()  
     
 def salvar_no_historico(dispositivos):
     #Abrimos a conexão

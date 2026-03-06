@@ -42,17 +42,30 @@ def cadastrar_dispositivo(disp: DispositivoConhecido):
     finally:
         conn.close()
 
-@app.get("/api/dispositivos")
 def salvar_no_historico(dispositivos): #usando o INSERT OR REPLACE para evitar DUPLICATAS no Banco
-    conn = sqlite3.connenct('seguranca.db')
-    cursor = conn.cursor()
-    for d in dispositivos:
-        cursor.execute('''
-            INSERT OR REPLACE INTO dispositivos_descobertos (ip, mac, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)     
-        ''', (d['ip'], d['mac']))
-        conn.commit()
+    try:
+        conn = sqlite3.connect('seguranca.db')
+        cursor = conn.cursor()
+        
+        for d in dispositivos:
+            ip = d.get('ip')
+            mac = d.get('mac')
+            
+            if ip and mac:
+                cursor.execute('INSERT INTO historico (ip, mac) VALUES (?,?)', (ip,mac))
+            
+            cursor.execute('''
+                INSERT OR REPLACE INTO dispositivos_descobertos (ip, mac, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)
+            ''', (ip, mac))
+            
+            conn.commit()
+            print("Banco de dados atualizado e limpo!")
+    except Exception as e:
+        print(f"Erro ao salvar: {e}")
+    finally:
         conn.close()
 
+@app.get("/api/dispositivos")
 def get_dispositivos():
     range_rede = "192.168.15.1/24"
     dispositivos = scan_network(range_rede)

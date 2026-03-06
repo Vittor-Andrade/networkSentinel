@@ -65,25 +65,33 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {dispositivos.map((d, index) => (
-              <tr key={index} className={d.status === 'INTRUSO' ? 'row-intruso' : 'row-conhecido'}>
-                <td>
-                  <span className={`badge ${d.status.toLowerCase()}`}>
-                    {d.status}
-                  </span>
-                </td>
-                <td>{d.ip}</td>
-                <td><code>{d.mac}</code></td>
-                <td>{d.nome_personalizado}</td>
-                <td>
-                  {(d.status === 'INTRUSO') && (
-                    <button className="btn-save" onClick={() => cadastrarConhecido(d.mac)}>
-                      Confiar
-                    </button>
-                  )}
+            {Array.isArray(dispositivos) && dispositivos.length > 0 ? (
+              dispositivos.map((d, index) => (
+                <tr key={index} className={d.status === 'INTRUSO' ? 'row-intruso' : 'row-conhecido'}>
+                  <td>
+                    <span className={`badge ${d.status ? d.status.toLowerCase() : ''}`}>
+                      {d.status}
+                    </span>
+                  </td>
+                  <td>{d.ip}</td>
+                  <td><code>{d.mac}</code></td>
+                  <td>{d.nome_personalizado}</td>
+                  <td>
+                    {d.status === 'INTRUSO' && (
+                      <button className="btn-save" onClick={() => cadastrarConhecido(d.mac)}>
+                        Confiar
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="5" style={{ textAlign: 'center', padding: '20px' }}>
+                  {loading ? "Buscando dispositivos..." : "Nenhum dado disponível ou erro no servidor."}
                 </td>
               </tr>
-            ))}
+            )}
           </tbody>
         </table>
       </main>
