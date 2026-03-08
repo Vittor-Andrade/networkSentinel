@@ -31,14 +31,19 @@ function App() {
     }
   };
 
-  useEffect(() => { fetchDispositivos(); }, []);
-
-  // --- O VIGIA (useEffect para a aba de histórico) ---
   useEffect(() => {
-    if (abaAtiva === 'historico') {
-      fetchHistorico();
-    }
-  }, [abaAtiva]);
+    //Faz a primeira busca ao carregar a página
+    fetchDispositivos();
+
+    // Configurando o intervalo de atualização automática (60 segundos)
+    const intervalo = setInterval(() => {
+      console.log("Auto-scan: Atualizando lista de dispositivos...");
+      fetchDispositivos();
+    }, 60000); 
+
+    //Limpando o intervalo se o usuário fechar a página
+    return() => clearInterval(intervalo);
+  }, []);
 
   const cadastrarConhecido = async (mac) => {
     const nome = prompt("Qual o nome deste dispositivo?");
