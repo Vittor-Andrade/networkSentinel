@@ -1,23 +1,21 @@
-from scapy.all import ARP, Ether, srp, conf
+from scapy.all import ARP, Ether, srp
 
 def scan_network(ip_range):
-    print(f"Escaner iniciando na rede: {ip_range}")
+    #1. Criando um pacote ARP pedindo "Quem tem esse IP?"
+    arp = ARP(pdst=ip_range)
     
-    # Criando o pacote
-    arp_request = ARP(pdst=ip_range)
-    broadcast = Ether(dst="ff:ff:ff:ff:ff:ff")
-    packet = broadcast / arp_request
+    #2. Criando um pacote Ethernet para envciar em broadcast
+    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
     
-    # No Windows, às vezes precisamos definir a interface explicitamente
-    # result = srp(packet, timeout=3, verbose=False, iface=conf.iface)[0]
+    #3. Unindo os pacotes
+    pacote = ether/arp
     
-    # Tentativa padrão com timeout maior (3 segundos)
-    result = srp(packet, timeout=3, verbose=False)[0]
+    #4. Enviamos e recebendo as respostas
+    resultado = srp(pacote, timeout=2, verbose=False)[0]
     
-    devices = []
-    for sent, received in result:
-        # Debug no console do Python para você ver se o MAC está chegando aqui
-        print(f"Encontrado: IP {received.psrc} - MAC {received.hwsrc}")
-        devices.append({'ip': received.psrc, 'mac': received.hwsrc})
-        
-    return devices
+    dispositivos = []
+    for enviado, recebido in resultado:
+        #Adicionando cada dispositivo recente a lista
+        dispositivos.append({'ip': recebido.psrc, 'mac': recebido.hwsrc})
+          
+    return dispositivos

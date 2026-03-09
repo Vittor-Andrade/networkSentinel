@@ -8,19 +8,18 @@ function App() {
   const [abaAtiva, setAbaAtiva] = useState('monitor');
   const [historico, setHistorico] = useState([]);
 
+  // Função para buscar os dispositivos em tempo real
   const fetchDispositivos = async () => {
-    setLoading(true);
     try {
       const response = await fetch('http://127.0.0.1:8000/api/dispositivos');
       const data = await response.json();
       setDispositivos(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error("Erro:", error);
-    } finally {
-      setLoading(false);
+      console.error("Erro ao carregar dispositivos:", error);
     }
   };
 
+  // Função para buscar o histórico no banco de dados
   const fetchHistorico = async () => {
     try {
       const response = await fetch('http://127.0.0.1:8000/api/historico');
@@ -31,18 +30,23 @@ function App() {
     }
   };
 
+  // Função unificada que chama as duas buscas ao mesmo tempo
+  const atualizarTudo = async () => {
+    setLoading(true);
+    await Promise.all([fetchDispositivos(), fetchHistorico()]);
+    setLoading(false);
+  };
+
+  // Controle de atualização automática (Ciclo de vida do componente)
   useEffect(() => {
-    //Faz a primeira busca ao carregar a página
-    fetchDispositivos();
+    atualizarTudo(); // Busca inicial ao abrir a página
 
-    // Configurando o intervalo de atualização automática (60 segundos)
     const intervalo = setInterval(() => {
-      console.log("Auto-scan: Atualizando lista de dispositivos...");
-      fetchDispositivos();
-    }, 60000); 
+      console.log("Auto-scan: Atualizando dados do Network Sentinel...");
+      atualizarTudo();
+    }, 60000); // Atualiza a cada 60 segundos
 
-    //Limpando o intervalo se o usuário fechar a página
-    return() => clearInterval(intervalo);
+    return () => clearInterval(intervalo); // Limpa o timer ao fechar a página
   }, []);
 
   const cadastrarConhecido = async (mac) => {
@@ -56,25 +60,27 @@ function App() {
         body: JSON.stringify({ mac: mac.toLowerCase(), nome: nome, tipo: 'Conhecido' })
       });
 
-      const result = await response.json()
+      const result = await response.json();
       
       if (result.status === "sucesso") {
         alert("Dispositivo confiado!");
-        fetchDispositivos();
+        atualizarTudo(); // Recarrega a lista e o histórico após cadastrar
       } else {
         alert("Erro do servidor: " + result.mensagem);
       }
     } catch (error) {
-      alert("Erro na conexão com o servidor.")
+      alert("Erro na conexão com o servidor.");
     }
   };
 
+  // Cálculos para os cards do Dashboard
   const total = dispositivos.length;
   const conhecidos = dispositivos.filter(d => d.status === 'Conhecido').length;
   const intrusos = dispositivos.filter(d => d.status === 'INTRUSO').length;
 
   return (
     <div className="container-fluid bg-light min-vh-100 p-4">
+      {/* Cabeçalho */}
       <header className="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
         <div>
           <h1 className="h3 fw-bold text-dark mb-0">Network Sentinel <small className="text-muted h6">v1.2</small></h1>
@@ -82,7 +88,7 @@ function App() {
         </div>
         <button 
           className={`btn ${loading ? 'btn-secondary' : 'btn-primary'} d-flex align-items-center gap-2 shadow-sm`} 
-          onClick={fetchDispositivos} 
+          onClick={atualizarTudo} 
           disabled={loading}
         >
           <RefreshCw size={18} className={loading ? 'spin' : ''} />
@@ -90,6 +96,7 @@ function App() {
         </button>
       </header>
 
+      {/* Dashboard Cards */}
       <div className="row g-3 mb-4">
         <div className="col-md-4">
           <div className="card border-0 shadow-sm p-3">
@@ -117,6 +124,7 @@ function App() {
         </div>
       </div>
 
+      {/* Menu de Abas */}
       <ul className="nav nav-pills mb-3 bg-white p-2 rounded shadow-sm d-inline-flex">
         <li className="nav-item">
           <button className={`nav-link ${abaAtiva === 'monitor' ? 'active' : ''}`} onClick={() => setAbaAtiva('monitor')}>
@@ -130,6 +138,7 @@ function App() {
         </li>
       </ul>
 
+      {/* Conteúdo das Tabelas */}
       <div className="card border-0 shadow-sm">
         <div className="card-body p-0">
           {abaAtiva === 'monitor' ? (

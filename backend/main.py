@@ -1,9 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from scanner import scan_network 
-from database import salvar_no_historico
 from pydantic import BaseModel
 import sqlite3
 from fastapi.middleware.cors import CORSMiddleware
+from datetime import datetime
 
 app = FastAPI()
 
@@ -15,72 +15,58 @@ app.add_middleware(
     allow_headers=["*"] 
 )
 
-# Rota inicial para teste
-@app.get("/")
-def home():
-    return {"status": "Sistema de Segurança Online"}
-
 class DispositivoConhecido(BaseModel):
     mac: str
     nome: str
     tipo: str 
-    
-@app.post("/api/cadastrar")
-def cadastrar_dispositivo(disp: DispositivoConhecido):
+
+def salvar_no_historico(dispositivos):
+    # Inserindo registros no histórico e atualizando a última visualização
     conn = sqlite3.connect('seguranca.db')
     cursor = conn.cursor()
     try:
-        # Insere ou atualiza o dispositivo na whitelist
-        cursor.execute('''
-            INSERT OR REPLACE INTO conhecidos (mac, nome, tipo)
-            VALUES(?, ?, ?)   
-        ''', (disp.mac.lower(), disp.nome, disp.tipo))
-        conn.commit()
-        return {"status": "sucesso", "mensagem": f"{disp.nome} cadastrado!"}
-    except Exception as e:
-        return {"status": "erro", "mensagem": str(e)}
-    finally:
-        conn.close()
-
-def salvar_no_historico(dispositivos): #usando o INSERT OR REPLACE para evitar DUPLICATAS no Banco
-    try:
-        conn = sqlite3.connect('seguranca.db')
-        cursor = conn.cursor()
-        
         for d in dispositivos:
             ip = d.get('ip')
             mac = d.get('mac')
             
             if ip and mac:
-                cursor.execute('INSERT INTO historico (ip, mac) VALUES (?,?)', (ip,mac))
+                # Registro cronológico no histórico com horário local
+                cursor.execute('''
+                    INSERT INTO historico (ip, mac, data_hora)
+                    VALUES (?, ?, datetime('now', 'localtime'))
+                ''', (ip, mac))
+                
+                # Atualização ou inserção do estado atual do dispositivo
+                cursor.execute('''
+                    INSERT OR REPLACE INTO dispositivos_descobertos (ip, mac, last_seen)
+                    VALUES (?, ?, datetime('now', 'localtime'))
+                ''', (ip, mac))
             
-            cursor.execute('''
-                INSERT OR REPLACE INTO dispositivos_descobertos (ip, mac, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)
-            ''', (ip, mac))
-            
-            conn.commit()
-            print("Banco de dados atualizado e limpo!")
+        conn.commit()
+        print(f"[{datetime.now()}] Logs de rede atualizados com sucesso.")
     except Exception as e:
-        print(f"Erro ao salvar: {e}")
+        print(f"Erro crítico ao salvar no banco: {e}")
     finally:
         conn.close()
-        
-@app.get("/api/historico")
-def get_historico():
+
+# --- ROTAS DA API ---
+
+@app.get("/")
+def home():
+    return {"status": "Network Sentinel v1.2 - Ativo"}
+
+@app.post("/api/cadastrar")
+def cadastrar_dispositivo(disp: DispositivoConhecido):
+    # Rota para adicionar um dispositivo à Whitelist (Lista de Confiança)
     conn = sqlite3.connect('seguranca.db')
     cursor = conn.cursor()
     try:
-        #Usando uma subquery para pegar a última aparição de cada MAC
         cursor.execute('''
-            SELECT ip, mac, strftime('%d/%m/%Y %H:%M:%S', MAX(data_hora)) as ultima_vista
-            FROM historico 
-            WHERE mac IS NOT NULL
-            GROUP BY mac 
-            ORDER BY data_hora DESC
-        ''')
-        rows = cursor.fetchall()
-        logs = [{"ip": row[0], "mac": row[1], "data": row[2]} for row in rows]
-        return logs
+            INSERT OR REPLACE INTO conhecidos (mac, nome, tipo)
+            VALUES (?, ?, ?)
+        ''', (disp.mac.lower(), disp.nome, disp.tipo))
+        conn.commit()
+        return {"status": "sucesso", "mensagem": f"{disp.nome} foi listado como confiável!"}
     except Exception as e:
         return {"status": "erro", "mensagem": str(e)}
     finally:
@@ -88,34 +74,61 @@ def get_historico():
 
 @app.get("/api/dispositivos")
 def get_dispositivos():
-    range_rede = "192.168.15.1/24"
-    dispositivos = scan_network(range_rede)
-    
-    # Busca a lista de conhecidos no banco
+    # Rota principal de monitoramento com o Auto-Scan
+    try:
+        # Define a faixa de IP da rede (Verifique se a sua é 192.168.15.0 ou 192.168.1.0)
+        range_rede = "192.168.15.0/24" 
+        dispositivos_escaneados = scan_network(range_rede)
+        
+        # Buscando a whitelist no banco para cruzar os dados
+        conn = sqlite3.connect('seguranca.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT mac, nome FROM conhecidos")
+        whitelist = {row[0].lower(): row[1] for row in cursor.fetchall()}
+        conn.close()
+        
+        resultado_final = []
+        for d in dispositivos_escaneados:
+            mac_limpo = d['mac'].lower()
+            
+            # Verifica se o dispositivo escaneado já é conhecido
+            if mac_limpo in whitelist:
+                d['status'] = "Conhecido"
+                d['nome_personalizado'] = whitelist[mac_limpo]
+            else:
+                d['status'] = "INTRUSO"
+                d['nome_personalizado'] = "Desconhecido"
+            
+            # Adiciona o dispositivo processado à lista final
+            resultado_final.append(d)
+        
+        # Salva a movimentação da rede no banco de dados
+        salvar_no_historico(resultado_final)
+        
+        return resultado_final
+    except Exception as e:
+        # Retorna o erro detalhado para ajudar no diagnóstico (Erro 500)
+        print(f"Erro no Scan: {e}")
+        raise HTTPException(status_code=500, detail=f"Falha no scan: {str(e)}")
+
+@app.get("/api/historico")
+def get_historico():
+    # Retorna o histórico agrupado por dispositivo para o dashboard
     conn = sqlite3.connect('seguranca.db')
     cursor = conn.cursor()
-    cursor.execute("SELECT mac, nome FROM conhecidos")
-    whitelist = {row[0].lower(): row[1] for row in cursor.fetchall()}
-    conn.close()
-    
-    resultado_final = []
-    
-    for d in dispositivos:
-        # Garantimos que o MAC está em minúsculo para comparar
-        mac_atual = d['mac'].lower()
-        
-        print(f"Debug: Processando MAC {mac_atual}")
-        
-        if mac_atual in whitelist:
-            d['status'] = "Conhecido"
-            d['nome_personalizado'] = whitelist[mac_atual]
-        else:
-            d['status'] = "INTRUSO"
-            d['nome_personalizado'] = "Desconhecido"
-        
-        resultado_final.append(d)
-    
-    # Salvamos o resultado já processado no histórico
-    salvar_no_historico(resultado_final)
-    
-    return resultado_final
+    try:
+        cursor.execute('''
+            SELECT ip, mac, strftime('%d/%m/%Y %H:%M:%S', MAX(data_hora)) as ultima_visita
+            FROM historico
+            WHERE mac IS NOT NULL
+            GROUP BY mac
+            ORDER BY ultima_visita DESC 
+            LIMIT 30
+        ''')
+        rows = cursor.fetchall()
+        # Formata os dados para o padrão que o React espera
+        return [{"ip": r[0], "mac": r[1], "data": r[2]} for r in rows]
+    except Exception as e:
+        return {"status": "erro", "mensagem": str(e)}
+    finally:
+        conn.close()
