@@ -76,9 +76,8 @@ def cadastrar_dispositivo(disp: DispositivoConhecido):
 def get_dispositivos():
     # Rota principal de monitoramento com o Auto-Scan
     try:
-        # Define a faixa de IP da rede (Verifique se a sua é 192.168.15.0 ou 192.168.1.0)
-        range_rede = "192.168.15.0/24" 
-        dispositivos_escaneados = scan_network(range_rede)
+        #Agora não é mais passado IP, o scanner descobre sozinho.
+        dispositivos_escaneados = scan_network()
         
         # Buscando a whitelist no banco para cruzar os dados
         conn = sqlite3.connect('seguranca.db')
